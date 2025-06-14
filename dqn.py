@@ -51,8 +51,12 @@ class DQN:
         self.net = NeuralNetwork(self.obs_dim, self.act_dim)
 
         if self.use_target_network:
-            # TODO 1.6: Initialize DQN target network
+            # Initialize target network with same weights as main network
             self.target_net = NeuralNetwork(self.obs_dim, self.act_dim)
+            self.target_net.load_state_dict(self.net.state_dict())
+            # Target network is not trained via gradients directly
+            for param in self.target_net.parameters():
+                param.requires_grad = False
 
         # Set up optimizer, only needed for DQN network
         self.opt = optim.Adam(self.net.parameters(), lr=lr)
@@ -96,7 +100,7 @@ class DQN:
                 self.opt.step()
 
             if self.use_target_network and 0 == timestep % self.sync_after:
-                # TODO 1.6: Synchronize DQN target network
+                # Synchronize DQN target network with the main network
                 self.target_net.load_state_dict(self.net.state_dict())
 
 
@@ -138,16 +142,16 @@ class DQN:
         """
         # Mit Wahrscheinlichkeit Epsilon eine zufällige Aktion ausführen
         if np.random.random() < epsilon:
-            return np.random.randint(0, self.num_actions)
+            return self.env.action_space.sample()
         else:
-            # Beobachtung in einen Tensor umwandeln
-            obs_tensor = torch.FloatTensor(observation)
+            # Beobachtung in einen Tensor umwandeln und Batch-Dimension hinzufuegen
+            obs_tensor = torch.tensor(observation, dtype=torch.float32).unsqueeze(0)
 
-            # Durch das Netzwerk leiten (forward-Pass übernimmt das Batch-Format)
-            with torch.no_grad():  # Keine Gradienten benötigt für Inference
-                q_values = self.network(obs_tensor)
+            # Durch das Netzwerk leiten (forward-Pass uebernimmt das Batch-Format)
+            with torch.no_grad():  # Keine Gradienten benoetigt fuer Inference
+                q_values = self.net(obs_tensor)
 
-            # Index mit dem maximalen Q-Wert zurückgeben
+            # Index mit dem maximalen Q-Wert zurueckgeben
             return torch.argmax(q_values).item()
 
     def compute_msbe_loss(self):
